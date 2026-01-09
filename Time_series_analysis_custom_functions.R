@@ -1,7 +1,11 @@
-# Time series analysis regarding the expansion of Alexandrium pseudogonyaulax in northern European waters
-# by Kristof Möller (Alfred Wegener Institut), Jacob Carstensen and Hans Jakobsen (each Aarhus University)
-# as part of the Phd-thesis of Kristof Möller
-# file to store all custom functions of All_monitoring_stations R-file
+##########################################
+## Time series analysis investigating the potntial expansion of Alexandrium pseudogonyaulax in northern European waters 
+## File to store all custom functions of the Time Series Analysis
+## by Kristof Möller, Jacob Carstensen, Hans Jakobsen, Annette Engesmo and Bengt Karlson 
+## Questions to: kristof-moeller@outlook.de
+## Kristof Möller 06/24
+## Alfred-Wegener-Institute Bremerhaven / International Atomic Energy Agency Monaco
+##########################################
 
 install_packages <- function() {
   if (!require("pacman"))
@@ -38,7 +42,7 @@ install_packages <- function() {
   )
 }
 
-# Function to calculate seawater density ####
+####### Function to calculate seawater density ####### 
 calc_seawater_density <- function(temp, sal) {
   999.842594 +
     6.793952e-2 * temp -
@@ -52,7 +56,7 @@ calc_seawater_density <- function(temp, sal) {
     4.8314e-4 * sal^2
 }
 
-# Function to introduce stratification index if difference between upper and lower two meters ####
+####### Function to introduce stratification index if difference between upper and lower two meters ####### 
 # of the water colum exceed 1 gm cm^-3
 strat_index <- function(df) {
   df %>%
@@ -67,7 +71,7 @@ strat_index <- function(df) {
   ungroup()
 }
 
-# Function to introduce probability key (species absent or present) ####
+####### Function to introduce probability key (species absent or present) ####### 
 process_alexandrium_and_introduce_probability_key <-
   function(df) {
     df <- df %>%
@@ -119,7 +123,7 @@ process_alexandrium_and_introduce_probability_key <-
     return(df)
   }
 
-# Function retaining only a single 'No Alexandrium' entry per day ####
+####### Function retaining only a single 'No Alexandrium' entry per day ####### 
 filter_alexandrium <- function(df, species_col, name = "Alexandrium pseudogonyaulax",
                                grouping_cols = c("station", "date")) {
   df %>%
@@ -135,21 +139,7 @@ filter_alexandrium <- function(df, species_col, name = "Alexandrium pseudogonyau
     ungroup()
 }
 
-filter_alexandrium2 <- function(df, species_col, name = "Alexandrium pseudogonyaulax",
-                               grouping_cols = c("station", "date")) {
-  df %>%
-    filter(.data[[species_col]] %in% c("No Alexandrium", NA, name)) %>%
-    group_by(across(all_of(grouping_cols))) %>%
-    filter(!(any(probability == "present") & probability == "absent")) %>%
-    slice(ifelse(
-      any(probability == "present"),
-      which(probability == "present"),
-      1
-    )) %>%
-    ungroup()
-}
-
-# Function to update day, month, year and doy from date ####
+####### Function to update day, month, year and doy from date ####### 
 update_dates <- function(df) {
   df <- df %>% mutate(date = as.Date(date))
   df %>%
@@ -160,23 +150,23 @@ update_dates <- function(df) {
       year  = year(date))
 }
 
-# Function to remove station suffix from danish datasets ####
+####### Function to remove station suffix from danish datasets ####### 
 remove_station_suffix <- function(df) {
   df$station <- sub("-.*", "", df$station)
   df
 }
-# Function to harmonize metadata of danish datasets
-# Function to parse scientific number format ####
+
+####### Function to parse scientific number format ####### 
 scientific_10 <- function(x) {
   parse(text = gsub("e", " %*% 10^", scales::scientific_format()(x)))
 }
 
-# Function to harmonize metadata of danish datasets ####
+####### Function to harmonize metadata of danish datasets ####### 
 join_station_metadata <- function(df, station_meta) {
   left_join(df, station_meta, by = "station")
 }
 
-# Function to find the closest stations of wind stations and phytoplankton stations (used for Danish data set) ####
+####### Function to find the closest stations of wind stations and phytoplankton stations (used for Danish data set) ####### 
 find_closest_stations <- function(df1, df2) {
   closest_stations <-
     data.frame(station1 = character(),
@@ -191,18 +181,15 @@ find_closest_stations <- function(df1, df2) {
     for (i in 1:nrow(df1)) {
       station1 <- df1[i,]
       
-      # Calculate the distance between station1 and station2
       distance <-
         distHaversine(station1[c("Lon", "Lat")], station2[c("lon", "lat")])
       
-      # Update closest_station1 and min_distance if a smaller distance is found
       if (distance < min_distance) {
         closest_station1 <- station1$station
         min_distance <- distance
       }
     }
     
-    # Store the closest station1 for the current station2
     closest_stations <-
       rbind(
         closest_stations,
@@ -216,40 +203,38 @@ find_closest_stations <- function(df1, df2) {
   
   return(closest_stations)
 }
-# Function to change DMM to DM format ####
+
+####### Function to change DMM to DM format ####### 
 dmm_to_dd <- function(dmm_coordinates) {
   dmm_parts <-
-    strsplit(dmm_coordinates, " ") # Split degrees and minutes
+    strsplit(dmm_coordinates, " ") 
   degrees <-
-    as.numeric(dmm_parts[[1]][1])    # Convert degrees to numeric
+    as.numeric(dmm_parts[[1]][1])    
   minutes <-
-    as.numeric(dmm_parts[[1]][2])    # Convert minutes to numeric
+    as.numeric(dmm_parts[[1]][2]) 
   dd_coordinates <-
-    degrees + (minutes / 60)  # Calculate decimal degrees
+    degrees + (minutes / 60)
   return(dd_coordinates)
 }
-# Function to remove "NA_" prefix
+
+####### Function to remove "NA_" prefix ####### 
 remove_na_prefix <- function(col_name) {
   gsub("^NA_", "", col_name)
 }
 
-# Function to combine stations in close proximity with a threshold of 1km ####
+####### Function to combine stations in close proximity with a threshold of 1km ####### 
 combine_close_stations_dbscan <- function(df, threshold_km = 1) {
 
-  # 1. Get unique stations and coordinates
   station_coords <- df %>%
     dplyr::select(station, lat, lon) %>%
     dplyr::distinct() %>%
     tidyr::drop_na()
   
-  # 2. Calculate distance matrix in meters
   dist_matrix <- geosphere::distm(station_coords[, c("lon", "lat")], fun = geosphere::distHaversine)
   
-  # 3. Run DBSCAN clustering
   db <- dbscan::dbscan(dist_matrix, eps = threshold_km * 1000, minPts = 1) 
   station_coords$cluster_id <- db$cluster
   
-  # 4. Summarise into combined stations with renamed lat/lon
   grouped_stations <- station_coords %>%
     dplyr::group_by(cluster_id) %>%
     dplyr::summarise(
@@ -258,9 +243,8 @@ combine_close_stations_dbscan <- function(df, threshold_km = 1) {
       combined_lon = mean(lon, na.rm = T),
       .groups = "drop"
     )
-  
-  # 5. Prepare final mapping and return
-  station_mapping <- station_coords %>%
+
+    station_mapping <- station_coords %>%
     dplyr::left_join(grouped_stations, by = "cluster_id") %>%
     dplyr::transmute(
       combined_station,
@@ -272,7 +256,7 @@ combine_close_stations_dbscan <- function(df, threshold_km = 1) {
   return(station_mapping)
 }
 
-# Functions to combine 'strat' and 'limiting_condition' values ####
+####### Functions to combine 'strat' and 'limiting_condition' values ####### 
 combine_strat <- function(strat_values) {
   if ("stratified" %in% strat_values &
       "not stratified" %in% strat_values) {
@@ -285,6 +269,7 @@ combine_strat <- function(strat_values) {
     return(NA)
   }
 }
+
 combine_limiting_conditions <-
   function(limiting_conditions_values) {
     if ("yes" %in% limiting_conditions_values &
@@ -299,17 +284,14 @@ combine_limiting_conditions <-
     }
   }
 
-# Function to add lag columns for parameters of interest ####
-# Function checks whether there is lagged data available in the respective lagged timeframes
-# and otherwise prints NA
+####### Function to add lag columns for parameters of interest ####### 
 create_lagged_columns <- function(data, column_name, num_days) {
   data <- data[order(data$date), ]
-  lagged_values <- rep(NA_real_, nrow(data))  # Initialize with NA
+  lagged_values <- rep(NA_real_, nrow(data))  
   
   for (i in 1:nrow(data)) {
     current_date <- data$date[i]
     
-    # Find row where the date is exactly 'num_days' before
     target_date <- current_date - num_days
     match_index <- which(data$date == target_date)
     
@@ -324,15 +306,13 @@ create_lagged_columns <- function(data, column_name, num_days) {
   return(data)
 }
 
-# Log transformation function ####
+####### Log transformation function ####### 
 log_transform <- function(x) {
   result <- ifelse(x != 0 & !is.infinite(x), log(x), NA)
   return(result)
 }
 
-# Function to perform glms, including: ####
-# probability of presence vs. time (year, month, doy)
-# probability of presence vs. stratification and limiting conditions index
+####### Function to perform probability of presence GLMs ####### 
 check_and_fit <- function(data,
                           each_group,
                           result_month_name,
@@ -353,12 +333,10 @@ check_and_fit <- function(data,
     )
   }
   
-  # Initialize the station-specific list if it doesn't exist
   if (!exists(each_group, where = global_models_list)) {
     global_models_list[[each_group]] <- list()
   }
   
-  # Initialize local data frames
   result_month <- data.frame()
   result_year <- data.frame()
   result_doy <- data.frame()
@@ -506,7 +484,6 @@ check_and_fit <- function(data,
     
     result_year[[grouping_var]] = as.factor(each_group)
     
-    # Bind coefficients and meta-data in result_month/result_year
     result_doy <- bind_rows(result_doy,
                             data.frame(
                               data = exp(coef(M1a)) / (1 + exp(coef(M1a))),
@@ -517,7 +494,6 @@ check_and_fit <- function(data,
     
     result_doy[[grouping_var]] = as.factor(each_group)
     
-    # Bind coefficients and meta-data in result_month/result_year
     result_doy_gam <- data.frame(
       data = NA,
       doy = present_years_only$doy,
@@ -563,7 +539,6 @@ check_and_fit <- function(data,
     
     predicted_probs_df[[grouping_var]] = as.factor(each_group)
     
-    # Bind the results to the specified output data frames within results_list
     results_list[[result_month_name]] <-
       bind_rows(results_list[[result_month_name]], result_month)
     
@@ -585,9 +560,8 @@ check_and_fit <- function(data,
   }
 }
 
-# Functions to calculate seasonal means of abiotic parameters #### 
-# Helper function to set up the binomial glm of the stratification and limiting conditions index ####
-# and extract the results
+####### Functions to calculate seasonal means of abiotic parameters #######  
+# Helper function to set up the binomial glm of the stratification and limiting conditions index
 fit_binomial_glm <- function(df, response, station) {
   if (nlevels(droplevels(df[[response]])) < 2) return(NULL)
   mod <- as.formula(sprintf("factor(%s) ~ factor(month) + 0", response))
@@ -628,18 +602,14 @@ process_prob_col <- function(station_data, prob_col, station) {
 
 # Helper function to perform the glms for the abiotic parameters ####
 process_parameter_model <- function(station_data, param, station) {
-  # Filter for relevant months and years, remove NA and infinite, trim outliers
-  param_data <- station_data %>%
+
+    param_data <- station_data %>%
     filter(year >= 2008, month >= 5, month <= 10) %>%
     drop_na(!!sym(param)) %>%
     filter(!is.infinite(!!sym(param))) 
-  # %>%
-  #   filter(!!sym(param) < quantile(!!sym(param), 0.99, na.rm = TRUE))
-  
-  # If not enough data, skip
+
   if (nrow(param_data) <= 25) return(NULL)
   
-  # Model formula
   mod <- as.formula(sprintf("%s ~ factor(month) + 0", param))
   
   # Parameters that should NOT use log-link
@@ -649,7 +619,6 @@ process_parameter_model <- function(station_data, param, station) {
   # If log-link is to be used, check for negatives and add small constant if needed
   if (use_log) {
     if (any(param_data[[param]] < 0, na.rm = TRUE)) return(NULL)
-    # Add a small constant to avoid log(0)
     min_positive <- min(param_data[[param]][param_data[[param]] > 0], na.rm = TRUE)
     if (is.finite(min_positive)) {
       param_data[[param]] <- param_data[[param]] + min_positive / 10
@@ -668,11 +637,9 @@ process_parameter_model <- function(station_data, param, station) {
   
   if (is.null(glm_fit)) return(NULL)
   
-  # Extract coefficients
   coefs <- coef(glm_fit)
   coefs <- if (use_log) exp(coefs) else coefs
   
-  # Format output data
   tibble::enframe(coefs, name = "month_factor", value = "data") %>%
     filter(stringr::str_detect(month_factor, "month")) %>%
     mutate(
@@ -683,12 +650,11 @@ process_parameter_model <- function(station_data, param, station) {
     dplyr::select(time, station, parameter, data)
 }
 
-# Function to calculate the seasonal means using the three upper helper functions ####
+####### Function to calculate the seasonal means using the three upper helper functions ####### 
 calculate_seasonal_mean <- function(data, probability_columns) {
   parameters <- c("NH4", "NO3", "sal", "temp", "TN", "PO4", "chl",
                   "DIP", "DIN", "N_P", "C_chl", "silicate", "Si_N")
   
-  # For each station, process probability columns and parameters, then bind all results
   data %>%
     split(.$station) %>%
     map_dfr(function(station_data) {
@@ -699,18 +665,15 @@ calculate_seasonal_mean <- function(data, probability_columns) {
         return(tibble())
       }
       
-      # Process all probability columns
       prob_results <- map_dfr(probability_columns, ~process_prob_col(station_data, .x, station))
       
-      # Process all environmental parameters
       param_results <- map_dfr(parameters, ~process_parameter_model(station_data, .x, station))
       
-      # Bind all results for this station
       bind_rows(prob_results, param_results)
     })
 }
 
-# Custom labeller function for abiotic parameter plots ####
+####### Custom labeller function for abiotic parameter plots ####### 
 custom_labeller <- function(variable) {
   titles <- c(
     "NH4" = "NH<sub>4</sub><sup>+</sup> (<i>&mu;</i>mol L<sup>-1</sup>)",
@@ -737,15 +700,13 @@ custom_labeller <- function(variable) {
   return(titles[variable])
 }
 
-# Function to construct seasonal means plot ####
+####### Function to construct seasonal means plot ####### 
 create_seasonal_means_plot <- function(facet_name, label) {
 
-    # Subset the data
   p_subset <- sa_plot %>%
     filter(parameter == facet_name & probability > 0) %>%
     drop_na(probability, data)
   
-  # Construct the plot
   p <- ggplot(p_subset, aes(x = data, y = probability)) +
     geom_point(size = 1.5) +
     facet_wrap(
@@ -776,13 +737,12 @@ create_seasonal_means_plot <- function(facet_name, label) {
       legend.position = "top"
     ) +
     xlab("") +
-    # geom_smooth(method = "lm", se = F) +
     ylab("Probability of presence<br> of <i>A. pseudogonyaulax</i>") +
-    ggtitle(paste0(label, ")"))  # Add the facet label to the plot title
+    ggtitle(paste0(label, ")"))  
   return(p)
 }
 
-# function to find all years with minimum one present observation of respective Alexandrium ####
+####### Function to find all years with minimum one present observation of respective Alexandrium ####### 
 find_years_of_presence <- function(data, probability_columns) {
   years_of_presence <- list()
   
@@ -812,7 +772,7 @@ find_years_of_presence <- function(data, probability_columns) {
   return(years_of_presence)
 }
 
-# function to find all years with minimum one present observation of respective Alexandrium ####
+####### Function to find all years with minimum one present observation of respective Alexandrium ####### 
 find_years_since_first_observation <-
   function(data, probability_columns) {
     years_since_first_observation <- list()
@@ -846,9 +806,9 @@ find_years_since_first_observation <-
     return(years_since_first_observation_df)
   }
 
-# Function to calculate mean abiotic parameter when respective Alexandrium is present or absent ####
+####### Function to calculate mean abiotic parameter when respective Alexandrium is present or absent ####### 
 # Seasonal variation of the respective abiotic parameter is approximated via a sinus- and cosinusoidal function
-# Sinusoidal and cosinusoidal helper functions
+
 sin_function <- function(doy, amplitude) {
   amplitude * sin(2 * pi * doy / 365)
 }
@@ -858,7 +818,6 @@ cos_function <- function(doy, amplitude) {
 
 # Helper function to fit the model
 fit_model <- function(data, parameter) {
-  # Use summary statistics to estimate starting parameters
   amplitude_init <- 2
 
   nls_formula <- as.formula(
@@ -898,11 +857,6 @@ process_data <- function(data,
         filter(species == prob_col) %>%
         pull(year)
       
-      # if (!is.null(years_of_presence2)) {
-      #   param_data <- param_data %>%
-      #     filter(year %in% years_of_presence2,
-      #            month >= 5, month <= 10)
-      
       if (!is.null(years_of_presence2)) {
         param_data <- param_data %>%
           filter(year >= 2008,
@@ -926,7 +880,6 @@ process_data <- function(data,
       
       if(length(valid_months) >= 3){
       
-      # Log-transform when appropriate
       if (!(parameter %in% c(
         parameters_of_interest[grep("temp", parameters_of_interest)],
         "sal",
@@ -993,7 +946,6 @@ process_data <- function(data,
           }
         }
         
-        # Determine if parameter is log-transformed
         log_transformed <- !(parameter %in% c(
           parameters_of_interest[grep("temp", parameters_of_interest)],
           "sal",
@@ -1012,7 +964,6 @@ process_data <- function(data,
           median_absent <- exp(median(bootstrap_absent, na.rm = TRUE))
           median_present <- exp(median(bootstrap_present, na.rm = TRUE))
           
-          # Use these in your results:
           mean_absent <- median_absent
           mean_present <- median_present
         } else {
@@ -1034,7 +985,7 @@ process_data <- function(data,
         
         coefficients_data <- data.frame(
           parameter = parameter,
-          relative_deviation = relative_deviation,  # ratio: present / absent
+          relative_deviation = relative_deviation,  
           present = mean_present,
           absent = mean_absent,
           lower_ci = lower_ci,
@@ -1066,13 +1017,10 @@ process_data <- function(data,
   return(parameter_results)
 }
 
-
-
-# Function to backtransform log transformed coefficients ####
+####### Function to backtransform log transformed coefficients ####### 
 backtransformation_of_log_transformed_coefficients <-
   function(Coef_stations_back,
            parameters_of_interest) {
-    # Initialize an empty data frame to store backtransformed values
     Coef_stations_back3 <- data.frame()
       filter_col <- "station"
 
@@ -1114,13 +1062,11 @@ backtransformation_of_log_transformed_coefficients <-
                   station = station
                 )
 
-                # Append the new row to the new data frame
                 Coef_stations_back3 <-
                   bind_rows(Coef_stations_back3, new_row)
               } else if (!(each_parameter %in% c("temp", "strat", "limiting_conditions")) &&
                          !is.na(mean_val)) {
 
-                # Create a new row with the backtransformed value and replicate the original row information
                 new_row <- data.frame(
                   parameter = each_parameter,
                   mean_val =  exp(mean_val) / (1 + exp(mean_val)),
@@ -1132,7 +1078,6 @@ backtransformation_of_log_transformed_coefficients <-
                   station = station
                 )
                 
-                # Append the new row to the new data frame
                 Coef_stations_back3 <-
                   bind_rows(Coef_stations_back3, new_row)
               }
@@ -1144,8 +1089,7 @@ backtransformation_of_log_transformed_coefficients <-
     return(Coef_stations_back3)
   }
 
-# Function to calculate upr and lwr limit of the confidence interval of monthly and yearly probabilities ####
-# of Alexandrium presence 
+####### Function to calculate upr and lwr limit of the confidence interval of monthly and yearly probabilities ####### 
 calculate_upr_lwr <- function(df) {
   if (nrow(df) > 0 && !is.null(df$CI)) {
     df$upr <- pmin(df$data + df$CI, 1)
@@ -1157,7 +1101,7 @@ calculate_upr_lwr <- function(df) {
   return(df)
 }
 
-# Function to calculate seasonal probability of each water body ####
+####### Function to calculate seasonal probability of each water body ####### 
 calculate_seasonal_probability <- function(df, prob_col) {
   result_all <- data.frame()
   
@@ -1206,11 +1150,12 @@ calculate_seasonal_probability <- function(df, prob_col) {
 }
 
 format_range <- function(x, digits = 1) {
-  if (all(is.na(x))) return(NA_character_)
+  if (all(is.na(x)))
+    return(NA_character_)
   paste0(round(min(x, na.rm = TRUE), digits), "-", round(max(x, na.rm = TRUE), digits))
 }
 
-# Helper function to add common theme and labels for combined station doyly plot
+####### Helper function to add common theme and labels ####### 
 add_common_theme <- function(plot, label = "", x_label = "time (doy)", y_label = "", ylim_range = NULL) {
   plot <- plot +
     ggtitle(label) +
@@ -1227,8 +1172,7 @@ add_common_theme <- function(plot, label = "", x_label = "time (doy)", y_label =
 }
 
 
-# Functions to generate maps ####
-# Common function to build a stations map with parameters for coords, point size, land color, and legend visibility ####
+####### Functions to generate maps ####### 
 make_station_map <- function(coordinates,
                              point_size = 3,
                              land_col = "grey90",
@@ -1334,7 +1278,6 @@ create_plot_abiotic <- function(facet_name, label) {
     )
 }
 
-# Functions to create ggplots of monthly/yearly station probability data ####
 create_plot <-
   function(data,
            model,
@@ -1343,7 +1286,7 @@ create_plot <-
            title_var,
            save_path,
            filename) {
-    # List to store plots
+
     plots <- list()
     
     gg <-
@@ -1439,7 +1382,6 @@ create_plot <-
     
     if (exists("manuscript_subset")) {
       if (identical(data, manuscript_subset)) {
-        # Check if the data is manuscript_subset
         gg <- gg +
           scale_x_continuous(breaks = seq(1996, 2020, by = 2),
                              limits = c(1996, 2020), expand = c(0, 0)) +
@@ -1456,7 +1398,6 @@ create_plot <-
            plot = gg,
            path = save_path)
     
-    # Return the list of plots
     return(plots)
   }
 
@@ -1559,5 +1500,5 @@ create_plot2 <-
                            expand = c(0.01, 0.01))
     }
     
-    return(gg)  # Return the ggplot object
+    return(gg)  
   }

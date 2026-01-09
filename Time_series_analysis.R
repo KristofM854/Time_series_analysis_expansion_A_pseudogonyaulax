@@ -3,9 +3,9 @@
 ## by Kristof Möller, Jacob Carstensen, Hans Jakobsen, Annette Engesmo and Bengt Karlson 
 ## Questions to: kristof-moeller@outlook.de
 ## Kristof Möller 06/24
-## Alfred-Wegener-Institute Bremerhaven
+## Alfred-Wegener-Institute Bremerhaven / International Atomic Energy Agency Monaco
 ##########################################
-# Load custom functions #####
+####### Load custom functions ####### 
 script_dir <- setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 script_dir <- setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 source(paste0(script_dir, "/", "Time_series_analysis_custom_functions.R"))
@@ -13,7 +13,7 @@ source(paste0(script_dir, "/", "Time_series_analysis_custom_functions.R"))
 # Install needed packages
 install_packages()
 
-# Load NORWAY Data ####### 
+####### Load NORWAY Data #######
 norway_counts <- # including phytoplankton data
  read_delim(
   paste0(script_dir, "/", "norway", "/", "phyto_aug24.txt"),
@@ -31,7 +31,8 @@ norway_waterquality <-
   col_types = cols(.default = "c")
  )
 
-norway_ctd <- # including water profiles
+# Load CTD data
+norway_ctd <-
   read_delim(
     paste0(script_dir, "/", "norway", "/", "norway_ctd_full.txt"),
     delim = "\t",
@@ -39,7 +40,7 @@ norway_ctd <- # including water profiles
     col_types = cols(.default = "c")
   )
 
-# General data transformations : CTD-data ####### 
+####### General data transformations #######
 norway_ctd <- norway_ctd %>%
   mutate(across(all_of(c(37:38, 40:46)), ~ as.numeric(gsub(",", ".", .))))
 
@@ -72,7 +73,7 @@ norway_ctd <- norway_ctd %>%
 
 # calculate the density column
 norway_ctd <- norway_ctd %>% mutate(temp = as.numeric(temp), sal = as.numeric(sal)) %>%
- mutate(density = calc_seawater_density(temp, sal))
+  mutate(density = calc_seawater_density(temp, sal))
 
 # combine both water depth in one (One sometimes contains NAs)
 norway_ctd <-
@@ -96,7 +97,6 @@ norway_ctd <- norway_ctd %>%
  ) %>%
  ungroup()
 
-# General data transformations : microalgal counts data ####### 
 norway_counts <- norway_counts %>%
  dplyr::select(
   station  = lok_kode_new_tlj,
@@ -111,7 +111,6 @@ norway_counts <- norway_counts %>%
   lon      = longitude
  )
 
-# Perform left join and select only the lat and lon columns from norway_counts
 norway_waterquality <- left_join(
  norway_waterquality,
  norway_counts %>% 
@@ -133,20 +132,20 @@ norway_counts <- norway_counts %>%
  )
 
 # Introduce probability key and change all non-Alexandrium pseudogonyaulax entries to "No Alexandrium"
-norway_counts <- norway_counts %>% mutate(cells_L = as.numeric(cells_L)) %>% process_alexandrium_and_introduce_probability_key()
+norway_counts <- norway_counts %>% 
+  mutate(cells_L = as.numeric(cells_L)) %>% 
+  process_alexandrium_and_introduce_probability_key()
 
 # remove any absent entries on dates where A. pseudogonyaulax was actually present
 # stems from the operation before that changed all other species to "No Alexandrium"
 # thus on all present days "No Alexandrium" exists as well and needs to be removed
-alex_intermediate <- norway_counts %>% 
+alex_intermediate <- norway_counts %>%
   filter(!species %in% c("No Alexandrium", "Alexandrium pseudogonyaulax"))
 
 norway_counts <- filter_alexandrium(norway_counts, species_col = "species")
 
 norway_counts <- full_join(norway_counts, alex_intermediate)
 
-# General data transformations : chemical and physical parameters ####### 
-# change column names
 norway_waterquality <- norway_waterquality %>%
   mutate(across(all_of(c(2:11, 13:14)), ~ as.numeric(.))) %>%
  dplyr::rename(
@@ -157,8 +156,8 @@ norway_waterquality <- norway_waterquality %>%
   date     = dato
  ) 
 
-# Merge all Norwegian data files ####### 
-# Average abiotic parameter dataframes by date and station as they occassionally have two measurements
+####### Merge all Norwegian data files ####### 
+# Average abiotic parameter dataframes by date and station as they occasionally have two measurements
 norway_waterquality_sub <- norway_waterquality %>% 
   group_by(station, date) %>%  
   dplyr::select(-doy, -day, -month, -year, -lat, -lon) %>%
@@ -170,9 +169,11 @@ norway_ctd_sub <- norway_ctd %>%
   reframe(across(c(1:3), \(x) mean(x, na.rm = TRUE))) 
 
 # Full join both abiotic parameter dataframes
-norway_abiotic <- full_join(norway_waterquality_sub, norway_ctd_sub, by = c("date", "station"))
+norway_abiotic <- full_join(norway_waterquality_sub,
+                            norway_ctd_sub,
+                            by = c("date", "station"))
 
-# Loop over all unique stations and join abiotic and phytoplankton dataframes with a 1 day threshold ####
+####### Loop over all unique stations and join abiotic and phytoplankton dataframes with a 1 day threshold ####### 
 all_stations_norway <- unique(c(unique(norway_counts$station), unique(norway_abiotic$station)))
 norway_list <- list()
 
@@ -206,7 +207,7 @@ for(each_station in all_stations_norway){
 
 norway_combined <- do.call(rbind, norway_list)
 
-# Update lat, lon and day, doy, month, year ####
+####### Finalize dataframe ####### 
 unique_stations <- norway_combined %>% group_by(station) %>%
   dplyr::summarise(lat = mean(lat, na.rm = T), 
                    lon = mean(lon, na.rm = T))
@@ -217,7 +218,7 @@ norway_combined <- full_join(norway_combined %>% ungroup() %>% dplyr::select(-la
 
 norway_combined <- update_dates(norway_combined %>% drop_na(date))
 
-# introduce logistic column (0 = absent and 1 = present) for logistic regression ####
+# introduce logistic column (0 = absent and 1 = present) for logistic regression
 norway_combined <-
  norway_combined %>%
  mutate(probability = ifelse(species == "Alexandrium pseudogonyaulax", "present", "absent")) %>%
@@ -225,7 +226,6 @@ norway_combined <-
  convert_as_factor(probability) %>% 
   mutate(month = month(date))
 
-# Average numeric data from the same stations and dates ####
 norway_combined <-
  norway_combined %>% group_by(
   station,
@@ -246,14 +246,13 @@ norway_combined <-
  ) %>%
  dplyr::summarise_if(is.numeric, mean, na.rm = TRUE)
 
-# # Save norway_combined as a new txt.file ####
+# Save norway_combined as a new txt.file
 write.table(norway_combined,
       file = paste0(script_dir, "/", "norway_combined.txt"),
       sep = "\t",
       row.names = FALSE)
 
 ####### DANISH Data ####### 
-# Read in data files
 # Phytoplankton counts data
 denmark_counts <-
   read_delim(
@@ -312,8 +311,7 @@ denmark_secci_kd   <- remove_station_suffix(denmark_secci_kd)
 denmark_waterquality <- remove_station_suffix(denmark_waterquality)
 denmark_ctd     <- remove_station_suffix(denmark_ctd)
 
-# General data transformations: CTD-Data ####### 
-# change column names
+####### General data transformations ####### 
 denmark_ctd <- denmark_ctd %>%
  dplyr::rename(
   depth = `depth (m)`,
@@ -369,7 +367,9 @@ denmark_counts$species <- str_replace_all(denmark_counts$species,
  c("_" = " ", "Alexandrium pseudogoniaulax" = "Alexandrium pseudogonyaulax")
 )
 
-denmark_counts <- denmark_counts %>% mutate(cells_L = as.numeric(cells_L)) %>% process_alexandrium_and_introduce_probability_key()
+denmark_counts <- denmark_counts %>% 
+  mutate(cells_L = as.numeric(cells_L)) %>% 
+  process_alexandrium_and_introduce_probability_key()
 
 # Aggregate carbon data per station and date first
 denmark_carbon <- denmark_counts %>% 
@@ -411,7 +411,7 @@ denmark_combined <- denmark_counts %>%
  full_join(denmark_ctd) %>%
  full_join(denmark_secci_kd)
 
-# Merge all Danish data files ####### 
+####### Merge all Danish data files ####### 
 # Average abiotic parameter dataframes by date and station as they occassionally have two measurements
 denmark_counts_sub <- denmark_counts %>% 
   group_by(station, date, species, across(starts_with("probability"))) %>%
@@ -438,7 +438,7 @@ denmark_abiotic <- full_join(
     by = c("date", "station")
   )
   
-# Loop over all unique stations and join abiotic and phytoplankton dataframes with a 1 day threshold ####
+####### Loop over all unique stations and join abiotic and phytoplankton dataframes with a 1 day threshold ####### 
 all_stations_denmark <- unique(c(unique(denmark_counts_sub$station), unique(denmark_abiotic$station)))
 denmark_list <- list()
 
@@ -467,7 +467,7 @@ for(each_station in all_stations_denmark){
 
 denmark_combined <- do.call(rbind, denmark_list)
 
-# Update lat, lon and day, doy, month, year ####
+####### Finalize dataframe ####### 
 unique_stations <- full_join(
   full_join(
     full_join(
@@ -491,7 +491,7 @@ denmark_combined <- full_join(denmark_combined %>% ungroup() %>% dplyr::select(-
 
 denmark_combined <- update_dates(denmark_combined %>% drop_na(date))
 
-# Read wind data files #####
+####### Read wind data files ####### 
 denmark_wind <-
  read_delim(
   paste0(script_dir, "/", "denmark", "/", "wind_data.txt"),
@@ -505,8 +505,7 @@ denmark_wind_stations <-
   fill = TRUE
  )
 
-# General data transformations wind data ####### 
-# change date format, introduce doy, and change comma to points and change to numeric
+# General data transformations
 denmark_wind <- denmark_wind %>% 
  mutate(
  date =
@@ -542,7 +541,7 @@ denmark_combined <- merge(denmark_combined, closest_stations, by = "station", al
 
 colnames(denmark_wind)[1] <- "wind_match"
 
-# Merge denmark_combined and denmark wind and finalize ####### 
+####### Merge denmark_combined and denmark wind ####### 
 denmark_combined <-
  merge(
   denmark_combined,
@@ -594,14 +593,12 @@ denmark_combined <-
   PO4 = PO4 / 94.9712
  ) %>% drop_na(station, date) 
 
-# # Save denmark_combined as a new txt.file ####### 
 write.table(denmark_combined,
       paste0(script_dir, "/", "denmark_combined.txt"),
       sep = "\t",
       row.names = FALSE)
 
-######### SWEDISH DATA ####### 
-# Load Swedish data ####### 
+####### SWEDISH DATA #######
 sweden_phys <-
  read_delim(
   paste0(script_dir, "/", "sweden", "/", "sharkweb_phys2.txt"),
@@ -637,7 +634,7 @@ sweden_phyto_2024 <- read_delim(
 
 sweden_phyto <- full_join(sweden_phyto, sweden_phyto_2024)
 
-# # General Data Preparation for sweden_phyto ####### 
+####### General Data Preparation ####### 
 sweden_phyto <- sweden_phyto %>%
  dplyr::select(
   station   = reported_station_name,
@@ -656,7 +653,6 @@ sweden_phyto <- sweden_phyto %>%
   sedimentation_volume = sedimentation_volume_ml
  )
 
-# Replace all commas with dots in all columns
 sweden_phyto <- sweden_phyto %>%
  mutate(across(
   c(
@@ -674,7 +670,6 @@ sweden_phyto <- sweden_phyto %>%
   ~ gsub(",", ".", .)
  ))
 
-# Convert counts and counts_coefficient to numeric
 sweden_phyto <- sweden_phyto %>%
  mutate(counts = as.numeric(counts),
      counts_coefficient = as.numeric(counts_coefficient))
@@ -687,7 +682,6 @@ sweden_phyto <- sweden_phyto %>%
   TRUE ~ counts
  ))
 
-# Convert LAT and LON to decimal degrees
 sweden_phyto <- sweden_phyto %>%
  mutate(
   lat  = sapply(lat, dmm_to_dd),
@@ -727,8 +721,6 @@ sweden_phyto <- filter_alexandrium(sweden_phyto, "species")
 
 sweden_phyto <- full_join(sweden_phyto, alex_intermediate)
 
-# General Data transformations for SW_phys ####### 
-# Keep columns of interest and change to english names
 sweden_phys <- sweden_phys %>%
  mutate(
   lat = sapply(`Provets latitud (DM)`, dmm_to_dd),
@@ -826,8 +818,7 @@ for (i in 1:num_chunks) {
 # Combine all summarized dataframes
 sweden_phys <- do.call(rbind, summarized_dfs)
 
-# Combine microalgae and physical parameters datasets
-# Merge all  data files ####### 
+# Merge microalgae and physical parameters datasets
 sweden_abiotic <- sweden_phys %>% 
   dplyr::select(-lat, -lon)
 
@@ -890,22 +881,13 @@ sweden_combined <- sweden_combined %>%
   update_dates() %>% 
  filter(is.na(parameter) | parameter != "Abundance")
 
-# # Save sweden_combined as a new txt.file #####
+# Save sweden_combined as a new txt.file
 write.table(sweden_combined,
       file = paste0(script_dir, "/", "sweden_combined.txt"),
       sep = "\t",
       row.names = FALSE)
 
-########## IOW-Odin data #########
-# Load data #####
-# germany_combined <- read_delim(
-#  file = paste0(script_dir, "/", "germany", "/", "odin2_2024-01-31_095801.txt"),
-#  delim = "\t",
-#  skip = 2,
-#  col_names = FALSE,
-#  col_types = cols(.default = "c")
-# )
-
+####### IOW-Odin data ####### 
 germany_combined <- read_delim(
   file = paste0(script_dir, "/", "germany", "/", "odin2_2025-09-12_070935_red.txt"),
   delim = "\t",
@@ -937,7 +919,7 @@ station_details = read_delim(
  col_names = T
 )
 
-# General data transformations #####
+####### General data transformations ####### 
 # remove all columns containing biomass or carbon in the name as we are only interested in cell counts
 germany_combined <- germany_combined %>%
  dplyr::select(-starts_with("NA_Carbon_"), -starts_with("NA_Biomass_"))
@@ -1008,8 +990,7 @@ germany_combined <- germany_combined %>%
 
 germany_combined <- full_join(germany_combined, alex_intermediate)
 
-# Include secci depth and wind speed #####
-# select columns of interest and change columns to english and to match germany_combined dataframe
+# Include secci depth and wind speed
 station_details <- station_details %>%
  dplyr::select(
   station = 'Station_name',
@@ -1024,7 +1005,8 @@ station_details <- station_details %>%
 station_details$date <-
  str_sub(station_details$date,
      start = 1,
-     end   = 10) %>% as.Date(format = "%d.%m.%Y")
+     end   = 10) %>% 
+  as.Date(format = "%d.%m.%Y")
 
 # Average all numeric columns of the same station and date
 germany_combined <-
@@ -1094,9 +1076,8 @@ write.table(germany_combined,
       paste0(script_dir, "/", "germany_combined.txt"),
       sep = "\t",
       row.names = FALSE)
-#
-########### MERGING OF ALL MONITORING PROGRAMS ####### 
-# # Read in previously modified and saved dataframes
+
+####### MERGING OF ALL MONITORING PROGRAMS ####### 
 germany_combined = read_delim(
  paste0(script_dir, "/", "germany_combined.txt"),
  delim = "\t",
@@ -1124,15 +1105,16 @@ setDT(sweden_combined)
 setDT(germany_combined)
 
 # Update dates for all data 
-data_frames <- list(norway_combined, denmark_combined, sweden_combined, germany_combined)
+data_frames <- list(norway_combined,
+                    denmark_combined,
+                    sweden_combined,
+                    germany_combined)
 
 updated_data_frames <- lapply(data_frames, update_dates)
 
 all_data <- as.data.frame(reduce(updated_data_frames, full_join)) 
 
 # combine stations in close proximity
-# First average lat lon of each station, as they have small differences
-# Loop over each station, average lat lon, store in list
 unique_stations <- all_data %>%
  ungroup() %>%
  dplyr::select(station, lat, lon) %>%
@@ -1151,8 +1133,6 @@ all_data <- all_data %>%
  ) %>%
  ungroup()
 
-# find stations in close proximity; threshold = +/- 1km
-# dataframe contains combined stations, old stations and the new averaged lat / lon of combined stations
 close_stations <- combine_close_stations_dbscan(all_data)
 
 # Update all_data with new stations, lat and lons
@@ -1194,7 +1174,7 @@ all_data <- all_data %>%
 all_data <- all_data %>%
   mutate(
     logistic = case_when(
-      is.na(probability) ~ NA_real_,      # Keep NA as NA (use NA_real_ for numeric column)
+      is.na(probability) ~ NA_real_,      
       probability == "absent" ~ 0,
       TRUE ~ 1
     )
@@ -1202,36 +1182,29 @@ all_data <- all_data %>%
   convert_as_factor(probability, logistic) %>%
   update_dates()
 
-# # Save all_data as a new txt.file #####
+# Save all_data as a new txt.file
 write.table(all_data,
       file = paste0(script_dir, "/", "all_data.txt"),
       sep = "\t",
       row.names = FALSE)
 
-# Garbage collection: call after large objects have been removed ####### 
 gc()
-
-# Delete workspace, clean environment/variables and restarte R if used memory piles up
-# dev.off()
 rm(list = ls())
-
-# restart R
 .rs.restartR()
 
-########### CELL DENSITY AND STATION PLOTS ####### 
-# Load custom functions #####
+####### CELL DENSITY AND STATION PLOTS ####### 
 script_dir <- setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 source(paste0(script_dir, "/", "Time_series_analysis_custom_functions.R"))
 install_packages()
 
-# read in all_data to start here ####### 
+####### read in all_data to start here ####### 
 all_data = read_delim(
  file = paste0(script_dir, "/", "all_data.txt"),
  delim = "\t",
  col_names = T
 )
 
-# Introduce 5 year and 10 year column ####### 
+# Introduce 5 year and 10 year column
 breaks <- c(1997, 2007, 2012, 2017, 2022) 
 labels <- c("1997-2006", "2007-2011", "2012-2016", "2017-2021")
 
@@ -1379,18 +1352,17 @@ station_characteristics <-
  station_characteristics %>% 
  relocate(combined_station, lat, lon, sampling_range)
 
-## plot stations that passed the filtering criteria and export ####### 
 # Only keep the first station name of combined stations as otherwise the station names are very long
 filtered_data$station <-
  sapply(strsplit(filtered_data$station, ","), function(x) x[1])
 
-# Save filtered_data as a new txt.file ######
+# Save filtered_data as a new txt.file
 write.table(filtered_data,
       file = paste0(script_dir, "/", "filtered_data.txt"),
       sep = "\t",
       row.names = FALSE)
 
-# Get dataframe of unique combination of station / lat / lon; arrange by latitude and introduce station numbering ####### 
+####### Get dataframe of unique combination of station / lat / lon and introduce station numbering ####### 
 unique_stations <-
  filtered_data %>% 
   ungroup() %>%
@@ -1472,9 +1444,9 @@ tab <-
   save_as_docx(path = paste0(script_dir, "/", "station_characteristics.docx"))
 
 
-# Plot time series stations for the manuscript ####### 
+####### Plot time series stations for the manuscript ####### 
 # Coordinates for two maps
-coordinates1 <- data.frame(lon = c(3.5, 3.5, 23, 23), 
+coordinates1 <- data.frame(lon = c(3.5, 3.5, 23, 23),
                            lat = c(54, 73.5, 73.5, 54))
 
 coordinates2 <- data.frame(lon = c(7.5, 7.5, 17, 17), 
@@ -1628,12 +1600,11 @@ mean_cell_dens <-
  mutate(log_cells_L = log(cells_L))
 
 
-# Cell density plot preparation ####
+####### Cell density plot preparation ####### 
 # Specific breaks and their log-transformed values
 breaks <- c(10^0, 10^1, 10^2, 10^3, 10^4, 10^5)
 log_breaks <- log(breaks)
 
-# Custom labels for the breaks
 custom_labels <- scales::scientific_format()(breaks)
 
 custom_breaks <-
@@ -1645,7 +1616,6 @@ coordinates2 <-
  data.frame(lon = c(7.5, 7.5, 20.5, 20.5), 
             lat = c(53.5, 60.5, 60.5, 53.5))
 
-# Create a custom color gradient 
 custom_colors <-
  c(viridis(256)[1:200], colorRampPalette(c("orange", "red"))(56))
 
@@ -1656,10 +1626,9 @@ species_vec <- c(
  "Alexandrium spp."
 )
 
-# Define a list to store the plots
 plot_list <- list()
 
-# Cell density plot ####
+####### Cell density plot ####### 
 walk(species_vec, function(species_name) {
  
  species_data <- mean_cell_dens %>%
@@ -1757,25 +1726,16 @@ ggsave(
  units = "in"
 )
 
-# Cell density plot 2 preparation ####
-# construct yearly plot with mean cell densities of each species including the amount of present observations ####### 
+####### Cell density plot 2 ####### 
 mean_cell_dens <- filtered_data %>%
  filter(species %in% c("Alexandrium pseudogonyaulax", "No Alexandrium")) %>%
  drop_na(cells_L) %>%
  group_by(station, year, species, lat, lon) %>%
  dplyr::summarise(cells_L = mean(cells_L, na.rm = TRUE), n = n()) 
-# %>%
-#  drop_na(year)
 
 mean_cell_dens <-
  full_join(mean_cell_dens, unique_stations) %>% 
  mutate(log_cells_L = log(cells_L))
-
-# species_data <-
-#  mean_cell_dens %>% 
-#  filter(species == "Alexandrium pseudogonyaulax" & year >= 2006 &
-#                year <= 2011 ) %>% 
-#  drop_na(n)
 
 species_data <-
   mean_cell_dens %>% 
@@ -1795,7 +1755,6 @@ species_data <- species_data %>%
   filter(!("Alexandrium pseudogonyaulax" %in% species & species == "No Alexandrium")) %>%
   ungroup()
 
-# Cell density plot 2 ####
 cell_dens_plot <-
   basemap(
     data = coordinates2,
@@ -1804,7 +1763,6 @@ cell_dens_plot <-
     land.col = "grey75",
     rotate = T
   ) +
-  # Layer 1: Alexandrium pseudogonyaulax cells, colored by log_cells_L + size + shape
   ggspatial::geom_spatial_point(
     data = subset(species_data, species == "Alexandrium pseudogonyaulax"),
     aes(
@@ -1814,7 +1772,6 @@ cell_dens_plot <-
       size = n
     )
   ) +
-  # Layer 2: No Alexandrium, open black circle
   ggspatial::geom_spatial_point(
     data = subset(species_data, species == "No Alexandrium"),
     aes(
@@ -1824,7 +1781,7 @@ cell_dens_plot <-
     shape = 1, 
     size = 1, 
     color = "black",
-    stroke = 0.6         # controls line width of the circle
+    stroke = 0.6        
   ) +
   facet_wrap( ~ year) +
   scale_color_gradientn(
@@ -1890,13 +1847,12 @@ ggsave(
  units = "in"
 )
 
-############## TIME SERIES ANALYSIS ####### 
-# read in filtered_data to start here: ####### 
-# Load custom functions
+####### TIME SERIES ANALYSIS ####### 
 script_dir <- setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 source(paste0(script_dir, "/", "Time_series_analysis_custom_functions.R"))
 install_packages()
 
+# read in filtered_data to start here:
 filtered_data = read_delim(
  paste0(script_dir, "/", "filtered_data.txt"),
  delim = "\t",
@@ -1949,11 +1905,9 @@ non_empty_dfs <-
   })
  })
 
-# Unlist the nested list and export non-empty dataframes to the global environment
 non_empty_dfs <- unlist(non_empty_dfs, recursive = FALSE)
 list2env(non_empty_dfs, envir = .GlobalEnv)
 
-# Define parameters of interest for the following loops
 parameters_of_interest <-
  c(
   "NH4",
@@ -1976,20 +1930,19 @@ parameters_of_interest <-
   "DIN_DIP"
  )
 
-# # Loop through column names of all_data to include lagged parameter columns into parameters_of_interest
-# matching_columns <- c()
-# for (col_name in colnames(filtered_data)) {
-#  # Check if col_name contains any parameter in parameters_of_interest using grepl
-#  if (any(grepl(paste(parameters_of_interest, collapse = "|"), col_name))) {
-#   matching_columns <- c(matching_columns, col_name)
-#  }
-# }
-# 
-# # update parameters_of_interest and remove NO3_NO2
-# parameters_of_interest <- matching_columns
-# parameters_of_interest <- setdiff(parameters_of_interest, "NO3+NO2")
+# Loop through column names of all_data to include lagged parameter columns into parameters_of_interest
+matching_columns <- c()
+for (col_name in colnames(filtered_data)) {
+ # Check if col_name contains any parameter in parameters_of_interest using grepl
+ if (any(grepl(paste(parameters_of_interest, collapse = "|"), col_name))) {
+  matching_columns <- c(matching_columns, col_name)
+ }
+}
 
-# Prepare data frames to store data generated by the previous check_and_fit functions
+# update parameters_of_interest and remove NO3_NO2
+parameters_of_interest <- matching_columns
+parameters_of_interest <- setdiff(parameters_of_interest, "NO3+NO2")
+
 Coef_stations <- data.frame() 
 
 # instead of using years_of_presence, rather use all years since the year of the first observation
@@ -1998,10 +1951,6 @@ Coef_stations <- data.frame()
 probability_columns <- colnames(filtered_data)[str_detect(colnames(filtered_data), "probability")]
 years_since_first_observation <-
  find_years_since_first_observation(filtered_data, probability_columns)
-
-script_dir <- setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
-source(paste0(script_dir, "/", "Time_series_analysis_custom_functions.R"))
-install_packages()
 
 stations <- unique(filtered_data$station)
 total_stations <- length(stations)
@@ -2080,18 +2029,57 @@ probparm_station_doyly_fit_characteristics <-
  ) %>%
  dplyr::ungroup()
 
-# Introduce water bodies to the filtered stations #####
+# Introduce water bodies to the filtered stations
 water_bodies <- c(
-  "estuary", "coastal", "estuary", "open", "coastal",
-  "estuary", "estuary", "open", "estuary",
-  "estuary", "coastal", "coastal", "estuary", "coastal",
-  "estuary", "estuary", "estuary", "open", "estuary",
-  "estuary", "estuary", "estuary", "coastal", "coastal",
-  "open", "coastal", "estuary", "coastal", "open",
-  "open", "estuary", "estuary", "coastal", "coastal",
-  "coastal", "open", "estuary", "coastal", "estuary",
-  "coastal", "estuary", "coastal", "open", "open",
-  "open", "open", "open", "open", "coastal"
+  "estuary",
+  "coastal",
+  "estuary",
+  "open",
+  "coastal",
+  "estuary",
+  "estuary",
+  "open",
+  "estuary",
+  "estuary",
+  "coastal",
+  "coastal",
+  "estuary",
+  "coastal",
+  "estuary",
+  "estuary",
+  "estuary",
+  "open",
+  "estuary",
+  "estuary",
+  "estuary",
+  "estuary",
+  "coastal",
+  "coastal",
+  "open",
+  "coastal",
+  "estuary",
+  "coastal",
+  "open",
+  "open",
+  "estuary",
+  "estuary",
+  "coastal",
+  "coastal",
+  "coastal",
+  "open",
+  "estuary",
+  "coastal",
+  "estuary",
+  "coastal",
+  "estuary",
+  "coastal",
+  "open",
+  "open",
+  "open",
+  "open",
+  "open",
+  "open",
+  "coastal"
 )
 
 station_and_waterbody <-
@@ -2102,7 +2090,7 @@ station_and_waterbody <-
   mutate(water_body = water_bodies)
 
 # Define the base directory path where plots will be saved
-script_dir <- getwd() # or specify your script directory
+script_dir <- getwd() 
 base_plot_dir <- file.path(script_dir, "figures", "abiotic_parameters", "deviation")
 
 # Create the base directory if it doesn't exist
@@ -2121,7 +2109,6 @@ Coef_stations <- left_join(Coef_stations, station_and_waterbody %>% dplyr::selec
     )
   )
 
-# Define which parameters should have % axis
 percent_parameters <- c("NO3", "PO4", "silicate", "N_P")
 
 plot_list <- list()
@@ -2131,14 +2118,12 @@ for (param in unique(Coef_stations$parameter)) {
   param_data <- Coef_stations %>% filter(parameter == param & species == "probability")  %>%
     mutate(sig_color = ifelse(lower_ci > 0 | upper_ci < 0, "darkred", "black"))
   
-  # Choose label function based on parameter name
   y_label_function <- if (param %in% percent_parameters) {
     scales::label_number(suffix = "%", accuracy = 1)
   } else {
     scales::label_number(accuracy = 0.1)
   }
   
-  # Create the plot
   plot <- ggplot(param_data, aes(x = station_number, y = relative_deviation)) +
     geom_point(aes(color = sig_color), size = 1.5) + 
     geom_errorbar(aes(ymin = lower_ci, ymax = upper_ci, color = sig_color), width = 0) +
@@ -2166,7 +2151,6 @@ for (param in unique(Coef_stations$parameter)) {
   
   plot_list[[param]] <- plot
   
-  # Determine the directory based on whether the parameter contains "lag"
   if (grepl("lag", param, ignore.case = TRUE)) {
     plot_dir <- file.path(base_plot_dir, "lag")
     if (!dir.exists(plot_dir)) {
@@ -2176,10 +2160,8 @@ for (param in unique(Coef_stations$parameter)) {
     plot_dir <- base_plot_dir
   }
   
-  # Define the file path for saving the plot
   plot_path <- file.path(plot_dir, paste0(param, ".png"))
   
-  # Save the plot
   ggsave(plot_path, plot, width = 10, height = 8, dpi = 300)
   
 }
@@ -2204,16 +2186,13 @@ ggsave(
   units = "in"
 )
 
-# Bootstrap GAM results #####
-# Settings
+# Bootstrap GAM results
 n_boot <- 10000
 threshold <- 0.1
 boot_results <- list()
 
-# Get unique DOY grid
 doy_grid <- seq(0, 365, length.out = 366)
 
-# For each station
 stations_sub <- filtered_data %>%
   group_by(station) %>%
   drop_na(probability) %>%
@@ -2224,8 +2203,7 @@ stations_sub <- filtered_data %>%
   ) %>% 
   filter(n_presence >= 10)
 
-# Set a random seed for reproducibility
-set.seed(123)  # You can use any number as the seed
+set.seed(123)  
 
 for (s in unique(stations_sub$station)) {
   dat_station <- filtered_data %>% 
@@ -2233,7 +2211,6 @@ for (s in unique(stations_sub$station)) {
     drop_na(probability)
   
   boot_summary <- replicate(n_boot, {
-    # Stratified resampling by presence/absence (probability)
     dat_boot <- dat_station %>%
       group_by(probability) %>%
       group_modify(~ slice_sample(.x, n = nrow(.x), replace = TRUE)) %>%
@@ -2250,7 +2227,7 @@ for (s in unique(stations_sub$station)) {
       error = function(e) return(NULL)
     )
     
-    if (is.null(fit)) return(rep(NA, 3))  # skip failed fit
+    if (is.null(fit)) return(rep(NA, 3))  
     
     pred <- predict(fit, newdata = data.frame(doy = doy_grid), type = "response")
     
@@ -2266,10 +2243,8 @@ for (s in unique(stations_sub$station)) {
   boot_results[[s]]$station <- s
 }
 
-# Combine results
 boot_all <- bind_rows(boot_results)
 
-# Summarize into confidence intervals
 ci_summary <- boot_all %>%
   pivot_longer(cols = c("t1", "t2", "p_max")) %>%
   group_by(station, name) %>%
@@ -2295,7 +2270,6 @@ group_diffs <- bootstrap_results %>%
     coastal_vs_open = coastal - open
   )
 
-# Summarize:
 group_diffs %>%
   dplyr::summarise(
     mean_diff = mean(estuary_vs_coastal, na.rm = T),
@@ -2341,7 +2315,6 @@ group_diffs <- bootstrap_results %>%
     estuary_vs_open = estuary - open
   )
 
-# Summarize:
 group_diffs %>%
   dplyr::summarise(
     mean_diff = mean(estuary_vs_coastal, na.rm = T),
@@ -2381,7 +2354,6 @@ group_diffs <- bootstrap_results %>%
     estuary_vs_open = estuary - open
   )
 
-# Summarize:
 group_diffs %>%
   dplyr::summarise(
     mean_diff = mean(estuary_vs_coastal, na.rm = T),
@@ -2403,7 +2375,10 @@ probparm_station_doyly_fit_characteristics <-
  filter(!is.infinite(t1) & !is.na(t1))
 
 # Calculate seasonal means
-filtered_data <- filtered_data %>% mutate(across(starts_with("prob"), as.factor)) %>% convert_as_factor(strat, limiting_conditions)
+filtered_data <- filtered_data %>% 
+  mutate(across(starts_with("prob"), as.factor)) %>% 
+  convert_as_factor(strat, limiting_conditions)
+
 seasonal_means <- calculate_seasonal_mean(filtered_data, "probability")
 
 prob_only <- seasonal_means %>%
@@ -2433,7 +2408,6 @@ sa_plot <- seasonal_means %>%
           probability  = mean(probability, na.rm = TRUE),
           .groups      = "drop")
 
-# Generate the plots
 plots <- Map(create_seasonal_means_plot, facet_parameters, letters[1:8])
 
 facet_plots_grid <- wrap_plots(plots, ncol = 4, nrow = 2, guides = "collect") +
@@ -2454,7 +2428,6 @@ ggsave(
 # List of variables to perform operations on
 variables <- c("t1", "t2", "p_max")
 
-# Function to perform the operations
 perform_aov <- function(var) {
  formula <- as.formula(paste(var, "~ water_body"))
 
@@ -2465,7 +2438,6 @@ perform_aov <- function(var) {
  print(TukeyHSD(aov_result))
 }
 
-# Apply the function to each variable
 aov_results_doyly_characteristics <- lapply(variables, perform_aov)
 
 # add station name and latitude to the dataframes
@@ -2479,7 +2451,6 @@ probparm_station_doyly_fit <-
       probparm_station_doyly_fit_characteristics %>% 
         dplyr::select(lat, lon, station))
 
-# export probparm_station_doyly_fit_characteristics as table
 tab <-
  probparm_station_doyly_fit_characteristics %>%
  arrange(water_body) %>%
@@ -2506,14 +2477,14 @@ amount_of_observations_all <- bind_rows(
   species = factor(species, levels = c("A. pseudogonyaulax", "A. ostenfeldii"))
  )
 
-# # Export the dataframe as a table in a word-document
-# tab <-
-#   amount_of_observations_all %>%
-#  flextable() %>%
-#  autofit() %>%
-#  save_as_docx(path = paste0(script_dir, "/", "amount_of_observations.docx"))
+# Export the dataframe as a table in a word-document
+tab <-
+  amount_of_observations_all %>%
+ flextable() %>%
+ autofit() %>%
+ save_as_docx(path = paste0(script_dir, "/", "amount_of_observations.docx"))
 
-##### Heatmap of the amount of present observations of A. ostenfeldii and A. pseudogonyaulax ####### 
+####### Heatmap of the amount of present observations of A. ostenfeldii and A. pseudogonyaulax ####### 
 reordered_levels <- amount_of_observations_all %>%
   dplyr::select(station_number) %>%
   unique() %>%  
@@ -2577,7 +2548,6 @@ amount_of_observations_plot <-
     }
   )
 
-# Save the heatmap 
 ggsave(
  filename = "amount_of_observations.png",
  plot     = amount_of_observations_plot,
@@ -2587,13 +2557,11 @@ ggsave(
  width    = 4.5
 )
 
-##### PLOT PROBABILITY PATTERNS OVER TIME ####### 
-# plot monthly data of each station and export
+####### PLOT PROBABILITY PATTERNS OVER TIME ####### 
 for (each_station in unique(probparm_station_monthly$station)) {
  p.subset <-
   probparm_station_monthly %>% 
   filter(station == each_station)
- # Print each_station and filename for debugging
  filename <- paste0(each_station, "_CI", ".png")
  create_plot(
   p.subset,
@@ -2602,7 +2570,7 @@ for (each_station in unique(probparm_station_monthly$station)) {
   "month",
   paste0(each_station, " monthly"),
   paste0(script_dir, "/", "figures", "/", "stations_monthly"),
-  filename # Specify the complete filename here
+  filename 
  )
 }
 
@@ -2613,8 +2581,6 @@ filtered_data <-
  left_join(station_and_waterbody %>% 
        dplyr::select(station, station_number, water_body))
 
-
-# Calcuate the seasonal probability
 result_all <-
  do.call(rbind, lapply(probability_columns, function(prob_col) {
   calculate_seasonal_probability(filtered_data %>% 
@@ -2694,7 +2660,6 @@ all_plots <-
   plot_annotation(theme = theme(legend.position = "bottom",
                                 legend.box.margin = margin(t = -5)))
 
-# Export plot
 ggsave(
  filename = "all_stations_monthly.png",
  plot = all_plots,
@@ -2711,7 +2676,6 @@ for (each_station in unique(probparm_station_doyly$station)) {
   mutate(doy = as.numeric(doy))
  p.subset2 <-
   probparm_station_doyly_fit %>% filter(station == each_station)
- # Print each_station and filename for debugging
  filename <- paste0(each_station, "_CI", ".png")
  create_plot(
   p.subset,
@@ -2720,7 +2684,7 @@ for (each_station in unique(probparm_station_doyly$station)) {
   "doy",
   paste0(each_station, " doyly"),
   paste0(script_dir, "/", "figures", "/", "station_doyly"),
-  paste0(each_station, ".png") # Specify the complete filename here
+  paste0(each_station, ".png")
  )
 }
 
@@ -2743,34 +2707,27 @@ for (each_station in unique(probparm_station_yearly$station)) {
 }
 
 # Modelling the probability of presence as a function of temperature for each station
-# Filter data and remove NAs for temperature
 filtered_data_temp <- filtered_data %>% 
  drop_na(temp, probability)
 
-# Initialize an empty list to store the results for each station
 results_list <- list()
 
- gam_temp <- filtered_data_temp %>% 
-  filter(month <= 10 & month >= 5 & year >= 2008)
+gam_temp <- filtered_data_temp %>% 
+filter(month <= 10 & month >= 5 & year >= 2008)
+
+M1a_gam <- mgcv::gam(data = gam_temp %>% filter(temp < 21.5 & temp >= 10),
+       probability ~ s(temp, bs = "tp", k = 3),
+       family = binomial)
+print(summary(M1a_gam))
+gam.check(M1a_gam)
+temp_gam_results <- data.frame(temp = seq(10, 21.5, length.out = 1000))
  
-  # Fit the GAM model
-  M1a_gam <- mgcv::gam(data = gam_temp %>% filter(temp < 21.5 & temp >= 10),
-         probability ~ s(temp, bs = "tp", k = 3),
-         family = binomial)
-   print(summary(M1a_gam))
-   gam.check(M1a_gam)
-   # Create a new data frame with a range of temp values
-   temp_gam_results <- data.frame(temp = seq(10, 21.5, length.out = 1000))
+pred <- predict(M1a_gam, temp_gam_results, type = "response", se.fit = TRUE)
    
-   # Use predict function to get the fitted values (modelled probabilities) and confidence intervals
-   pred <-
-    predict(M1a_gam, temp_gam_results, type = "response", se.fit = TRUE)
-   
-   # Add the predictions and confidence intervals to the temp_gam_results dataframe
-   temp_gam_results$probability <- pred$fit
-   temp_gam_results$se <- pred$se.fit
-   temp_gam_results$lower <- temp_gam_results$probability - 1.96 * temp_gam_results$se
-   temp_gam_results$upper <- temp_gam_results$probability + 1.96 * temp_gam_results$se
+temp_gam_results$probability <- pred$fit
+temp_gam_results$se <- pred$se.fit
+temp_gam_results$lower <- temp_gam_results$probability - 1.96 * temp_gam_results$se
+temp_gam_results$upper <- temp_gam_results$probability + 1.96 * temp_gam_results$se
 
 temp_gam_plot <- ggplot(temp_gam_results, aes(x = temp, y = probability)) +
  geom_point(
@@ -2817,7 +2774,6 @@ ggsave(
 )
 
 # Modelling the probability of presence as a function of temperature for each station
-# Filter data and remove NAs for temperature
 filtered_data_sal <- filtered_data %>% drop_na(sal, probability)
 
 results_df <- NULL
@@ -2827,7 +2783,6 @@ gam_sal <-
  filtered_data_sal %>% filter(sal <= 32 & sal >= 5 &
                  year >= 2008 & month <= 10 & month >= 5)
 
-# Fit the GAM model
 M1a_gam <-
  mgcv::gam(data = gam_sal,
       probability ~ s(sal, k = 4, bs = "tp"),
@@ -2835,13 +2790,10 @@ M1a_gam <-
 
 print(summary(M1a_gam))
 gam.check(M1a_gam)
-# Create a new data frame with a range of temp values
 sal_gam_results <- data.frame(sal = seq(5, 32, length.out = 10000))
 
-# Use predict function to get the fitted values (modelled probabilities) and confidence intervals
 pred <- predict(M1a_gam, sal_gam_results, type = "response", se.fit = TRUE)
 
-# Add the predictions and confidence intervals to the sal_gam_results dataframe
 sal_gam_results$probability <- pred$fit
 sal_gam_results$se <- pred$se.fit
 sal_gam_results$lower <- sal_gam_results$probability - 1.96 * sal_gam_results$se
@@ -2900,44 +2852,15 @@ ggsave(
  height = 3.5
 )
 
-
-# Step 1: Calculate the 90th percentile of the 'probability' column
-threshold <- quantile(sal_gam_results$probability, 0.75, na.rm = TRUE)
-
-# Step 2: Subset rows where probability is in the top 10%
-top_10 <- sal_gam_results[sal_gam_results$probability >= threshold, ]
-
-# Step 3: Find the salinity range within this top 10%
-salinity_min <- min(top_10$sal, na.rm = TRUE)
-salinity_max <- max(top_10$sal, na.rm = TRUE)
-
-# Print the result
-cat("Salinity range for top 20% probabilities:", salinity_min, "to", salinity_max, "\n")
-
-# Step 1: Calculate the 90th percentile of the 'probability' column
-threshold <- quantile(temp_gam_results$probability, 0.75, na.rm = TRUE)
-
-# Step 2: Subset rows where probability is in the top 10%
-top_10 <- temp_gam_results[temp_gam_results$probability >= threshold, ]
-
-# Step 3: Find the salinity range within this top 10%
-salinity_min <- min(top_10$temp, na.rm = TRUE)
-salinity_max <- max(top_10$temp, na.rm = TRUE)
-
-# Print the result
-cat("Temp range for top 20% probabilities:", salinity_min, "to", salinity_max, "\n")
-
-# Create method figure as part of figure 2 in the manuscript:
+# Create method figure as part of figure 2 in manuscript:
 probparm_station_doyly <-
  left_join(probparm_station_doyly, station_and_waterbody)
 
 probparm_station_doyly_fit <-
  left_join(probparm_station_doyly_fit, station_and_waterbody)
 
-source(paste0(script_dir, "/", "Time_series_analysis_custom_functions.R"))
-
 plot_list <- list()
-# plot doyly data of each water body and export #####
+
 for (each_water_body in unique(probparm_station_doyly$water_body)) {
  p.subset <-
   probparm_station_doyly %>% 
@@ -2959,31 +2882,25 @@ for (each_water_body in unique(probparm_station_doyly$water_body)) {
   paste0(script_dir, "/", "figures"),
   paste0(each_water_body, ".png") # Specify the complete filename here
  )
- # Merge the current list of plots with the overall list
+
  plot_list <- c(plot_list, plot)
 }
 
-# Function to calculate Gaussian distribution
 gaussian_distribution <- function(x, mean, sd) {
   exp(-(x - mean) ^ 2 / (2 * sd ^ 2)) / (sd * sqrt(2 * pi))
 }
 
-# Generate data
 x_values <- seq(-5, 5, length.out = 1000)
 y_values <- gaussian_distribution(x_values, mean = 0, sd = 1.25)
 
-# Scale y-values to ensure the maximum is 1
 y_values <- y_values / max(y_values) * 0.5
 
-# Find t1 and t2
 t1 <- min(x_values[y_values > 0.1])
 t2 <- max(x_values[y_values > 0.1])
 
-# Find tmax and pmax
 tmax <- x_values[which.max(y_values)]
 pmax <- max(y_values)
 
-# Create data frame for plotting
 df <- data.frame(x = x_values, y = y_values)
 
 plot_segments <- data.frame(
@@ -2993,7 +2910,6 @@ plot_segments <- data.frame(
  yend = c(0.1, 0.1, 0.1)
 )
 
-# Plot
 doy_method <- ggplot(df, aes(x, y)) +
  geom_line() + 
  geom_segment(data = plot_segments,
@@ -3087,12 +3003,10 @@ manuscript_stations <-
  calculate_upr_lwr(manuscript_stations) %>% 
  left_join(unique_stations, by = "station")
 
-# Create a list to store the individual plots
 plots <- list()
 plots2 <- list()
 manuscript_subset <- data.frame()
 
-# Loop to create and store the individual plots of each station in manuscript_stations subset
 for (each_station in unique(manuscript_stations$station)) {
  manuscript_subset <-
   manuscript_stations %>% 
@@ -3112,13 +3026,11 @@ for (each_station in unique(manuscript_stations$station)) {
           station_number,
           each_station)
  
- # Store the individual plot in the list
  plots[[length(plots) + 1]]   <- ggplotGrob(gg)
  plots2[[each_station]] <- gg
  
 }
 
-# Save each plot separately 
 for(i in 1:length(plots2)){
  name <- unique(plots2[[i]]$data$station)
  ggsave(
@@ -3177,12 +3089,6 @@ ggsave(
   units = "in"
 )
 
-# Garbage collection: call after large objects have been removed ####### 
 gc()
-
-# Delete workspace, clean environment/variables and restarte R if used memory piles up
-# dev.off()
 rm(list = ls())
-
-# restart R
 .rs.restartR()
