@@ -5,7 +5,7 @@
 ##########################################
 
 # 1. Setup -----------------------------------------------------------------
-script_dir <- setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
+script_dir <- here::here()
 source(file.path(script_dir, "Time_series_analysis_custom_functions.R"))
 install_packages()
 

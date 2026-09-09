@@ -6,8 +6,8 @@
 ## Alfred-Wegener-Institute Bremerhaven / International Atomic Energy Agency Monaco
 ##########################################
 ####### Load custom functions ####### 
-script_dir <- setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
-script_dir <- setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
+script_dir <- here::here()
+script_dir <- here::here()
 source(paste0(script_dir, "/", "Time_series_analysis_custom_functions.R"))
 
 # Install needed packages
@@ -1193,7 +1193,7 @@ rm(list = ls())
 .rs.restartR()
 
 ####### CELL DENSITY AND STATION PLOTS ####### 
-script_dir <- setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
+script_dir <- here::here()
 source(paste0(script_dir, "/", "Time_series_analysis_custom_functions.R"))
 install_packages()
 
@@ -1848,7 +1848,7 @@ ggsave(
 )
 
 ####### TIME SERIES ANALYSIS ####### 
-script_dir <- setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
+script_dir <- here::here()
 source(paste0(script_dir, "/", "Time_series_analysis_custom_functions.R"))
 install_packages()
 
