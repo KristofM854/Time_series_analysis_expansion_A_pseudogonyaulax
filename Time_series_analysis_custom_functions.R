@@ -34,7 +34,6 @@ install_packages <- function() {
     readr,
     readxl,
     rstatix,
-    rstudioapi,
     scales,
     stats,
     stringr,
