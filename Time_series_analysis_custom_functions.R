@@ -26,6 +26,7 @@ install_packages <- function() {
     ggtext,
     ggthemes,
     ggspatial,
+    here,
     mgcv,
     officer,
     patchwork,
