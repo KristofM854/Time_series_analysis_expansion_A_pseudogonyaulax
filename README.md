@@ -65,15 +65,19 @@ source("Time_series_analysis.R")
 
 Requires `data.table`, `dbscan`, `dplyr`, `flextable`, `fishmethods`,
 `fuzzyjoin`, `furrr`, `geosphere`, `ggOceanMaps`, `ggplot2`, `ggpubr`, `ggtext`,
-`ggthemes`, `ggspatial`, `mgcv`, `officer`, `patchwork`, `purrr`, `readr`,
-`readxl`, `rstatix`, `rstudioapi`, `scales`, `stringr`, `tidyverse`,
+`ggthemes`, `ggspatial`, `here`, `mgcv`, `officer`, `patchwork`, `purrr`,
+`readr`, `readxl`, `rstatix`, `scales`, `stringr`, `tidyverse`,
 `viridisLite`. `install_packages()` handles all of them.
 
 ## Known limitations
 
-- The working directory is set via `rstudioapi::getActiveDocumentContext()`, so
-  the scripts only run inside RStudio. Replace with `here::here()` or a manual
-  `setwd()` to run headless.
+- The working directory is resolved via `here::here()`, so it no longer
+  requires RStudio to locate the project root. `Time_series_analysis.R` still
+  calls `.rs.restartR()` twice between pipeline stages to free memory — an
+  RStudio-only function — so running the full script end-to-end still
+  requires RStudio; to run a stage headless, replace that call with
+  `rm(list = ls()); gc()` or run each section as a separate `Rscript`
+  invocation.
 - The main script is a linear pipeline rather than a set of functions. Run it
   top to bottom or resume from a written intermediate.
 - Station code assignments in `web_export.R` are duplicated from the main
