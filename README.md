@@ -56,6 +56,10 @@ lets you resume from `all_data.txt` without repeating the harmonisation step.
 
 ## Running it
 
+Open the `time-series-expansion.Rproj` file in RStudio. This sets the
+working directory to the repository root, which is what the scripts'
+relative paths assume. Then run any script top to bottom.
+
 ```r
 # R >= 4.2, inside RStudio
 source("Time_series_analysis_custom_functions.R")
