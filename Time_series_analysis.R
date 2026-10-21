@@ -1,12 +1,11 @@
 ##########################################
-## Time series analysis investigating the potntial expansion of Alexandrium pseudogonyaulax in northern European waters 
+## Time series analysis investigating the potential expansion of Alexandrium pseudogonyaulax in northern European waters 
 ## by Kristof Möller, Jacob Carstensen, Hans Jakobsen, Annette Engesmo and Bengt Karlson 
 ## Questions to: kristof-moeller@outlook.de
 ## Kristof Möller 06/24
 ## Alfred-Wegener-Institute Bremerhaven / International Atomic Energy Agency Monaco
 ##########################################
 ####### Load custom functions ####### 
-script_dir <- here::here()
 script_dir <- here::here()
 source(paste0(script_dir, "/", "Time_series_analysis_custom_functions.R"))
 

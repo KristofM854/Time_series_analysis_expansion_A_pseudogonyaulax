@@ -15,18 +15,31 @@ range and seasonal window across Northern European waters.
 
 ## Data
 
-The analysis runs on national monitoring data that are not redistributed here.
-Obtain them from the source programmes:
+The analysis runs on national monitoring data. None of it is included in this
+repository (nor ever was), and the Norwegian and Danish data may not be
+redistributed.
 
-| Country | Source | Files expected by the scripts |
+| Country | Source | Access |
 |---|---|---|
-| Norway | Norwegian phytoplankton and hydrography monitoring | `norway/phyto_aug24.txt`, `norway/nutrients.txt`, `norway/norway_ctd_full.txt` |
-| Denmark | ODA / Danish national monitoring (NOVANA) | `DK_counts.txt`, `DK_CTD.txt`, `DK_water_quality.txt`, `DK_secci_kd.txt`, `wind_data.txt`, `stationen_wind.txt` |
-| Sweden | SHARKweb (SMHI) | `sharkweb_phyto_new.txt`, `sharkweb_phyto_2024.txt`, `sharkweb_phys2.txt`, `sharkweb_phys_2024.txt` |
-| Germany | IOW ODIN2 | `odin2_2024-01-31_095801.txt`, `odin2_2025-09-12_070935_red.txt` |
+| Norway | Norwegian national phytoplankton and hydrography monitoring | Not redistributable; from the data holder on request (see the paper's data availability statement) |
+| Denmark | Danish national monitoring (NOVANA) | Not redistributable; from the data holder on request (see the paper's data availability statement) |
+| Sweden | SHARK, Swedish Meteorological and Hydrological Institute (SMHI) | Public: [SHARKweb](https://sharkweb.smhi.se) |
+| Germany | Leibniz Institute for Baltic Sea Research (IOW) | Public: [ODIN2](https://odin2.io-warnemuende.de); download dates are in the file names |
 
-Place them in the repository root, with the Norwegian files in a `norway/`
-subdirectory. `Station_details.txt` holds station metadata.
+The scripts expect one folder per country in the repository root:
+
+```
+norway/    phyto_aug24.txt, nutrients.txt, norway_ctd_full.txt
+denmark/   DK_counts.txt, DK_CTD.txt, DK_water_quality.txt, DK_secci_kd.txt,
+           wind_data.txt, stationen_wind.txt
+sweden/    sharkweb_phyto_new.txt, sharkweb_phyto_2024.txt,
+           sharkweb_phys2.txt, sharkweb_phys_2024.txt
+germany/   odin2_2024-01-31_095801.txt, odin2_2025-09-12_070935_red.txt,
+           Station_details.txt (station metadata)
+```
+
+`.gitignore` excludes these folders and every intermediate and output file,
+so that no monitoring data can be committed by accident.
 
 ## Contents
 
@@ -86,8 +99,11 @@ Requires `data.table`, `dbscan`, `dplyr`, `flextable`, `fishmethods`,
   top to bottom or resume from a written intermediate.
 - Station code assignments in `web_export.R` are duplicated from the main
   script and must be kept in sync manually.
-- No random seed is set. DBSCAN clustering is deterministic here, but
-  reproduce with the same package versions to be safe.
+- Random seeds are fixed for the station-level parameter estimates
+  (`set.seed(1234)`) and for the bootstrap (10,000 resamples) of the
+  season's start, end and peak probability (`set.seed(123)`). DBSCAN
+  clustering is deterministic. Package versions are not recorded, so results
+  can differ slightly with other versions.
 
 ## Status
 
