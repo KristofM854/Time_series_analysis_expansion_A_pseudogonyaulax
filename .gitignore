@@ -1,0 +1,23 @@
+# Monitoring data: not redistributable (Norway, Denmark) or obtained from the
+# source portals (Sweden, Germany). Never commit them.
+norway/
+denmark/
+sweden/
+germany/
+*.txt
+*.xlsx
+*.csv
+
+# Outputs written by the scripts
+figures/
+maps/
+*.docx
+*.json
+*.pdf
+*.png
+
+# R / RStudio
+.Rproj.user/
+.Rhistory
+.RData
+.Ruserdata
